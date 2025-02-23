@@ -40,35 +40,51 @@ def main():
 
 
 def weights(row):
-    """
-       Come up with some strategy to determine the weights of each asset in the portfolio.
-       Keep in mind that some assets might be heavily correlated,
-       some might be inversely correlated, and some might be entirely independent.
+    csv_files = ["CSVs/DAG_part1.csv", "CSVs/KOP_part1.csv", "CSVs/MON_part1.csv", "CSVs/PED_part1.csv", "CSVs/PUG_part1.csv", "CSVs/TAW_part1.csv", "CSVs/TOW_part1.csv", "CSVs/YON_part1.csv"]
+    if len(csv_files) < 8:
+        raise ValueError("At least 8 CSV files are required.")
 
-       Grading will be done based on Sharpe ratio (a measurement of risk-adjusted returns).
-       Also, keep in mind that you will NOT be graded on this data set --
-       it will be another 1000 candles drawn from the same distribution. This means
-       that while yes, you can look at future results in this dataset to make infinite money,
-       it will likely not be beneficial to do so.
+    price_series = []
+    for file in csv_files[:8]:
+        df = pd.read_csv(file)
+        price_series.append(df['C'].rename(file))
 
-       Good luck everyone!
-       """
-    DAG_df = pd.read_csv("CSVs/DAG_part1.csv")
-    KOP_df = pd.read_csv("CSVs/KOP_part1.csv")
-    MON_df = pd.read_csv("CSVs/MON_part1.csv")
-    PED_df = pd.read_csv("CSVs/PED_part1.csv")
-    PUG_df = pd.read_csv("CSVs/PUG_part1.csv")
-    TAW_df = pd.read_csv("CSVs/TAW_part1.csv")
-    TOW_df = pd.read_csv("CSVs/TOW_part1.csv")
-    YON_df = pd.read_csv("CSVs/YON_part1.csv")
-    # Above are pandas data frames for the individual stocks. We recommend using these to calculate the weights.
+    prices = pd.concat(price_series, axis=1).sort_index()
 
-    # This is just a simple example where all assets are equally weighted.
-    number_assets = 8
-    weights = [1/number_assets for _ in range(number_assets)]
+    returns = prices.pct_change().dropna()
+    GLOBAL_RETURNS = returns
+    ROLLING_WINDOW = 60
 
-    # please return the weights as a numpy array
-    return np.array(weights)
+    current_date = row.name
+
+    idx = GLOBAL_RETURNS.index.get_loc(current_date)
+    
+    if idx < ROLLING_WINDOW:
+        number_assets = GLOBAL_RETURNS.shape[1]
+        return np.ones(number_assets) / number_assets
+    
+    start_idx = idx - ROLLING_WINDOW
+    data_window = GLOBAL_RETURNS.iloc[start_idx:idx, :]
+    
+    mu = data_window.mean().values
+    Sigma = data_window.cov().values
+
+    try:
+        inv_Sigma = np.linalg.inv(Sigma)
+    except np.linalg.LinAlgError:
+        inv_Sigma = np.linalg.pinv(Sigma)
+
+    unnorm_w = inv_Sigma @ mu
+
+    sum_unnorm = np.sum(unnorm_w)
+    if sum_unnorm <= 0:
+        number_assets = GLOBAL_RETURNS.shape[1]
+        return np.ones(number_assets) / number_assets
+
+    w = unnorm_w / sum_unnorm
+
+    return w
+
 
 
 
